@@ -1,0 +1,59 @@
+/*
+===============================================================================
+CS F363 - Sample Input Program
+===============================================================================
+
+This program demonstrates the official grammar structure from the PDF.
+It includes function definitions, main function, type definitions,
+variable declarations, assignments, conditionals, loops, and I/O statements.
+
+Grammar Structure:
+<program> → <otherFunctions> <mainFunction>
+<otherFunctions> → <function> <otherFunctions> | ∈
+<mainFunction> → TK_MAIN <stmts> TK_END
+
+===============================================================================
+*/
+
+funid factorial input parameter list [int n] output parameter list [int result];
+type int : x : global;
+x <- 1;
+while (n > 1) read (n);
+x <- x * n;
+n <- n - 1;
+endwhile;
+return [x];
+
+main
+record #Employee
+type int : id : ;
+type real : salary : ;
+endrecord;
+
+union #Data
+type int : num : ;
+type real : val : ;
+endunion;
+
+type int : counter : global;
+type record #Employee : emp : ;
+type union #Data : data : ;
+
+counter <- 10;
+emp.id <- counter;
+emp.salary <- 50000.50;
+
+if (counter > 5) then
+    write (emp.id);
+    [result] call factorial with parameters [counter];
+else
+    write (counter);
+endif;
+
+while (counter > 0)
+    counter <- counter - 1;
+    write (counter);
+endwhile;
+
+return [];
+end

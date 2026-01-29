@@ -1,0 +1,115 @@
+===============================================================================
+CS F363 Compiler - Expected Output (Official Grammar)
+===============================================================================
+
+ANALYZING input.txt according to the OFFICIAL PDF grammar specification.
+
+PROGRAM STRUCTURE:
+===============================================================================
+
+<program>
+├── <otherFunctions>          # Function definitions before main
+│   └── <function>            # 'factorial' function
+│       ├── TK_FUNID          # 'funid'
+│       ├── <input_par>       # 'input parameter list [int n]'
+│       ├── <output_par>      # 'output parameter list [int result]'
+│       ├── TK_SEM            # ';'
+│       ├── <stmts>           # Function body statements
+│       └── TK_END            # 'end'
+└── <mainFunction>            # Main function
+    ├── TK_MAIN               # 'main'
+    ├── <stmts>               # Main function body
+    │   ├── <typeDefinitions> # Record and union definitions
+    │   ├── <declarations>    # Variable declarations
+    │   ├── <otherStmts>      # Executable statements
+    │   └── <returnStmt>      # Return statement
+    └── TK_END                # 'end'
+
+EXPECTED COMPILER OUTPUT:
+===============================================================================
+
+Compilation completed successfully!
+
+DETAILED ANALYSIS:
+===============================================================================
+
+1. LEXICAL ANALYSIS:
+   - Identifies 80+ tokens from official terminal set
+   - Recognizes all PDF-specified tokens: TK_FUNID, TK_MAIN, TK_RECORD, etc.
+   - Handles special operators: <-, [], (), ., :, ;, etc.
+   - Processes numbers, identifiers, keywords correctly
+   - Line number tracking for error reporting
+
+2. SYNTAX ANALYSIS (Official Grammar):
+   - Validates <program> → <otherFunctions> <mainFunction> structure
+   - Checks <function> definitions with input/output parameters
+   - Verifies <typeDefinition> for records and unions
+   - Validates <fieldDefinitions> and <fieldDefinition> syntax
+   - Confirms <declaration> statements with global/non-global variables
+   - Checks <assignmentStmt>, <conditionalStmt>, <iterativeStmt>
+   - Validates <funCallStmt> with parameter passing
+   - Verifies <ioStmt> for read/write operations
+
+3. GRAMMAR COMPLIANCE:
+   - Follows exact PDF grammar rules (1-47)
+   - Proper use of TK_SQL/TK_SQR for lists
+   - Correct TK_COLON usage in declarations
+   - Proper TK_SEM termination
+   - Valid <arithmeticExpression> and <booleanExpression> structures
+
+4. PARSE TREE STRUCTURE:
+   - Root: <program>
+   - Level 1: <otherFunctions>, <mainFunction>
+   - Level 2: <function>, <stmts>
+   - Level 3: <input_par>, <output_par>, <typeDefinitions>, <declarations>, etc.
+   - Proper parent-child relationships maintained
+
+KNOWN ISSUES (From Grammar Analysis):
+===============================================================================
+
+⚠️  LEFT RECURSION in Rule 33:
+   <arithmeticExpression> ===> <arithmeticExpression> <operator> <arithmeticExpression>
+
+   SOLUTION: Convert to LL(1) form:
+   <arithmeticExpression> → <term> <arithmeticExpression'>
+   <arithmeticExpression'> → <operator> <term> <arithmeticExpression'> | ∈
+
+⚠️  AMBIGUOUS PRODUCTIONS in Rules 30-31:
+   <conditionalStmt> has two productions with same prefix
+
+   SOLUTION: Left-factoring required for LL(1) parser
+
+===============================================================================
+
+GRAMMAR STATISTICS:
+===============================================================================
+
+- Total Non-terminals: 42
+- Total Terminals: 54
+- Total Productions: 47
+- Grammar Issues: 2 (Left recursion + Ambiguity)
+
+===============================================================================
+
+COMPILATION SUCCESS CRITERIA:
+===============================================================================
+
+✅ Program follows <program> → <otherFunctions> <mainFunction> structure
+✅ Function definitions use correct <input_par> <output_par> syntax
+✅ Type definitions follow <typeDefinition> rules for records/unions
+✅ Variable declarations use proper <declaration> format
+✅ Statements conform to <stmt> productions
+✅ Expressions follow <arithmeticExpression> and <booleanExpression> rules
+✅ All tokens are from official terminal set
+✅ Proper nesting and termination with TK_END
+
+===============================================================================
+
+If compilation fails, check:
+- Grammar rule implementation in parser.c
+- Token recognition in lexer.c
+- LL(1) conversion for left-recursive rules
+- Terminal/non-terminal mappings in terms
+- File encoding and format
+
+===============================================================================

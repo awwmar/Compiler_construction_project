@@ -1,0 +1,25 @@
+
+REPORT (Text version)
+
+1. Introduction
+This project implements the lexical and syntax analysis phases for the CS F363 language.
+
+2. Lexical Analysis
+- Removes comments (%) and normalizes whitespace.
+- Produces tokens as per Table 1 in the specification.
+- Reports lexical errors for malformed tokens like <--, 23.4, &&.
+
+3. Syntax Analysis
+- Uses LL(1)-compatible grammar.
+- Recursive-descent parsing with precedence for arithmetic expressions.
+- Handles statements, declarations, function calls, if/while, return.
+
+4. Grammar Fixes
+- Eliminated left recursion in expressions.
+- Added operator precedence and associativity.
+- Left-factored conditional statements.
+- Treated RUID (#name) as type reference.
+
+5. Assumptions
+- No semantic checks.
+- Grammar acceptance only.
