@@ -1,41 +1,55 @@
-project:
-  name: "CS F363 – Compiler Construction Project"
-  batch: 38
+# CS F363 – Compiler Construction Project
 
-  team_members:
-    - name: "Amar Kumar"
-      id: "2023A7PS0518P"
-    - name: "Krishna Saraf"
-      id: "2023A7PS0606P"
-    - name: "Ritik Kumar"
-      id: "2023A7PS0553P"
-    - name: "Shivansh Saxena"
-      id: "2023A7PS0637P"
-    - name: "Hitashi Raizada"
-      id: "2023A7PS0500P"
-    - name: "Arnav Sahoo"
-      id: "2023A7PS0560P"
+**Batch:** 38  
+**Project Scope:** Front-End Compiler Development
 
-  overview: |
-    This project implements the front-end phases of a compiler.
+---
 
-    Implemented:
-    - Lexical Analysis (tokenization with preprocessing)
-    - Syntax Analysis (recursive-descent parser using LL(1)-compatible grammar)
+## 👥 Team Members
 
-    Not Implemented:
-    - Semantic analysis (type checking, scope resolution)
-    - Code generation or execution
+| Name | ID Number |
+| :--- | :--- |
+| **Amar Kumar** | 2023A7PS0518P |
+| **Krishna Saraf** | 2023A7PS0606P |
+| **Ritik Kumar** | 2023A7PS0553P |
+| **Shivansh Saxena** | 2023A7PS0637P |
+| **Hitashi Raizada** | 2023A7PS0500P |
+| **Arnav Sahoo** | 2023A7PS0560P |
 
-  build_and_run: |
-    Compilation (C):
-      gcc -std=c17 src/main.c src/lexer/lexer.c src/parser/parser.c -o compiler
+---
 
-    Execution:
-      ./compiler testcases/valid/sample1.txt
+## 📖 Overview
 
-  folder_structure: |
-    docs/         -> Report, grammar, DFA scans
-    handwritten/  -> Handwritten DFA diagrams
-    src/          -> Lexer, parser, and main driver code
-    testcases/    -> Valid and invalid test programs
+This project implements the essential **front-end phases** of a compiler. The system processes source code to ensure it is lexically valid and syntactically correct according to defined grammar rules.
+
+### ✅ Implemented Features
+* **Lexical Analysis:** Tokenization engine with integrated preprocessing (handling comments, whitespace, etc.).
+* **Syntax Analysis:** A robust recursive-descent parser based on an **LL(1)-compatible grammar**.
+
+
+
+### 🚧 Out of Scope
+* **Semantic Analysis:** (Type checking, scope resolution).
+* **Back-End:** (Intermediate code generation, optimization, or target code execution).
+
+---
+
+## 📂 Folder Structure
+
+| Folder | Contents |
+| :--- | :--- |
+| `docs/` | Formal report, grammar specifications, and DFA scans. |
+| `handwritten/` | Manual DFA diagrams and logic sketches. |
+| `src/` | Implementation files (`lexer.c`, `parser.c`, `main.c`). |
+| `testcases/` | Collection of valid and invalid test programs for validation. |
+
+---
+
+## 🛠️ Build and Run
+
+Follow these instructions to compile and execute the compiler from your terminal.
+
+### 1. Compilation
+The project uses the **C17** standard. Compile all modules using `gcc`:
+```bash
+gcc -std=c17 src/main.c src/lexer/lexer.c src/parser/parser.c -o compiler
