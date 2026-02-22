@@ -1,0 +1,268 @@
+/*
+===============================================================================
+CS F363 Compiler Construction - Official Grammar Specification
+===============================================================================
+
+This file contains the COMPLETE and OFFICIAL LL(1) grammar for the CS F363
+programming language as provided in the assignment PDF. This is the exact
+grammar specification that must be implemented.
+
+Grammar Source: CS_F363_1318_2187e5f1-f4f6-471d-9715-d4dfe6b4479d-0935062a-bdff-4bde-a9ad-962000d62002.pdf
+
+===============================================================================
+NON-TERMINALS (Complete List)
+===============================================================================
+
+0.  program
+1.  mainFunction
+2.  otherFunctions
+3.  function
+4.  input_par
+5.  output_par
+6.  parameter_list
+7.  dataType
+8.  primitiveDatatype
+9.  constructedDatatype
+10. remaining_list
+11. stmts
+12. typeDefinitions
+13. typeDefinition
+14. fieldDefinitions
+15. fieldDefinition
+16. moreFields
+17. declarations
+18. declaration
+19. global_or_not
+20. otherStmts
+21. stmt
+22. assignmentStmt
+23. singleOrRecId
+24. funCallStmt
+25. outputParameters
+26. inputParameters
+27. iterativeStmt
+28. conditionalStmt
+29. ioStmt
+30. arithmeticExpression
+31. operator
+32. booleanExpression
+33. var
+34. logicalOp
+35. relationalOp
+36. returnStmt
+37. optionalReturn
+38. idList
+39. more_ids
+40. definetypestmt
+41. A
+
+===============================================================================
+TERMINALS (Complete List from PDF)
+===============================================================================
+
+42. TK_MAIN
+43. TK_END
+44. TK_FUNID
+45. TK_INPUT
+46. TK_PARAMETER
+47. TK_LIST
+48. TK_SQL          ([)
+49. TK_SQR          (])
+50. TK_INT
+51. TK_REAL
+52. TK_RECORD
+53. TK_RUID         (#name)
+54. TK_UNION
+55. TK_SEM          (;)
+56. TK_COLON        (:)
+57. TK_TYPE
+58. TK_FIELDID
+59. TK_ENDRECORD
+60. TK_ENDUNION
+61. TK_ID
+62. TK_GLOBAL
+63. TK_ASSIGNOP     (<-)
+64. TK_CALL
+65. TK_WITH
+66. TK_PARAMETERS
+67. TK_WHILE
+68. TK_OP           (()
+69. TK_CL           ())
+70. TK_IF
+71. TK_THEN
+72. TK_ELSE
+73. TK_ENDIF
+74. TK_READ
+75. TK_WRITE
+76. TK_PLUS         (+)
+77. TK_MUL          (*)
+78. TK_MINUS        (-)
+79. TK_DIV          (/)
+80. TK_AND
+81. TK_OR
+82. TK_NOT
+83. TK_LT           (<)
+84. TK_LE           (<=)
+85. TK_EQ           (==)
+86. TK_GT           (>)
+87. TK_GE           (>=)
+88. TK_NE           (!=)
+89. TK_RETURN
+90. TK_COMMA        (,)
+91. TK_NUM
+92. TK_RNUM
+93. TK_DOT          (.)
+94. TK_DEFINETYPE
+95. TK_AS
+
+===============================================================================
+OFFICIAL GRAMMAR RULES (Direct from PDF)
+===============================================================================
+*/
+
+1.  <program> ===> <otherFunctions> <mainFunction>
+
+2.  <mainFunction> ===> TK_MAIN <stmts> TK_END
+
+3.  <otherFunctions> ===> <function> <otherFunctions> | ∈
+
+4.  <function> ===> TK_FUNID <input_par> <output_par> TK_SEM <stmts> TK_END
+
+5.  <input_par> ===> TK_INPUT TK_PARAMETER TK_LIST TK_SQL <parameter_list> TK_SQR
+
+6.  <output_par> ===> TK_OUTPUT TK_PARAMETER TK_LIST TK_SQL <parameter_list> TK_SQR | ∈
+
+7.  <parameter_list> ===> <dataType> TK_ID <remaining_list>
+
+8.  <dataType> ===> <primitiveDatatype> | <constructedDatatype>
+
+9.  <primitiveDatatype> ===> TK_INT | TK_REAL
+
+10. <constructedDatatype> ===> TK_RECORD TK_RUID | TK_UNION TK_RUID
+
+11. <remaining_list> ===> TK_COMMA <parameter_list> | ∈
+
+12. <stmts> ===> <typeDefinitions> <declarations> <otherStmts> <returnStmt>
+
+13. <typeDefinitions> ===> <typeDefinition> <typeDefinitions> | ∈
+
+14. <typeDefinition> ===> TK_RECORD TK_RUID <fieldDefinitions> TK_ENDRECORD
+
+15. <typeDefinition> ===> TK_UNION TK_RUID <fieldDefinitions> TK_ENDUNION
+
+16. <fieldDefinitions> ===> <fieldDefinition> <fieldDefinition> <moreFields>
+
+17. <fieldDefinition> ===> TK_TYPE <primitiveDatatype> TK_COLON TK_FIELDID TK_SEM
+
+18. <moreFields> ===> <fieldDefinition> <moreFields> | ∈
+
+19. <declarations> ===> <declaration> <declarations> | ∈
+
+20. <declaration> ===> TK_TYPE <dataType> TK_COLON TK_ID TK_COLON <global_or_not> TK_SEM
+
+21. <global_or_not> ===> TK_GLOBAL | ∈
+
+22. <otherStmts> ===> <stmt> <otherStmts> | ∈
+
+23. <stmt> ===> <assignmentStmt> | <iterativeStmt> | <conditionalStmt> | <ioStmt> | <funCallStmt>
+
+24. <assignmentStmt> ===> <singleOrRecId> TK_ASSIGNOP <arithmeticExpression> TK_SEM
+
+25. <singleOrRecId> ===> TK_ID | TK_ID TK_DOT TK_FIELDID
+
+26. <funCallStmt> ===> <outputParameters> TK_CALL TK_FUNID TK_WITH TK_PARAMETERS <inputParameters>
+
+27. <outputParameters> ===> TK_SQL <idList> TK_SQR TK_ASSIGNOP | ∈
+
+28. <inputParameters> ===> TK_SQL <idList> TK_SQR
+
+29. <iterativeStmt> ===> TK_WHILE TK_OP <booleanExpression> TK_CL <stmt> <otherStmts> TK_ENDWHILE
+
+30. <conditionalStmt> ===> TK_IF <booleanExpression> TK_THEN <stmt> <otherStmts> TK_ELSE <otherStmts> TK_ENDIF
+
+31. <conditionalStmt> ===> TK_IF <booleanExpression> TK_THEN <stmt> <otherStmts> TK_ENDIF
+
+32. <ioStmt> ===> TK_READ TK_OP <var> TK_CL TK_SEM | TK_WRITE TK_OP <var> TK_CL TK_SEM
+
+33. <arithmeticExpression> ===> <arithmeticExpression> <operator> <arithmeticExpression>
+
+34. <arithmeticExpression> ===> TK_OP <arithmeticExpression> TK_CL | <var>
+
+35. <operator> ===> TK_PLUS | TK_MUL | TK_MINUS | TK_DIV
+
+36. <booleanExpression> ===> TK_OP <booleanExpression> TK_CL <logicalOp> TK_OP <booleanExpression> TK_CL
+
+37. <booleanExpression> ===> <var> <relationalOp> <var>
+
+38. <booleanExpression> ===> TK_NOT <booleanExpression>
+
+39. <var> ===> TK_ID | TK_NUM | TK_RNUM
+
+40. <logicalOp> ===> TK_AND | TK_OR
+
+41. <relationalOp> ===> TK_LT | TK_LE | TK_EQ | TK_GT | TK_GE | TK_NE
+
+42. <returnStmt> ===> TK_RETURN <optionalReturn> TK_SEM
+
+43. <optionalReturn> ===> TK_SQL <idList> TK_SQR | ∈
+
+44. <idList> ===> TK_ID <more_ids>
+
+45. <more_ids> ===> TK_COMMA <idList> | eps
+
+46. <definetypestmt> ===> TK_DEFINETYPE <A> TK_RUID TK_AS TK_RUID
+
+47. <A> ===> TK_RECORD | TK_UNION
+
+/*
+===============================================================================
+GRAMMAR ANALYSIS
+===============================================================================
+
+ISSUES IDENTIFIED:
+==================
+
+1. LEFT RECURSION in arithmeticExpression (Rule 33):
+   <arithmeticExpression> ===> <arithmeticExpression> <operator> <arithmeticExpression>
+
+2. AMBIGUOUS PRODUCTIONS:
+   - conditionalStmt has two productions (30 & 31) with same prefix
+   - Need left-factoring for LL(1) compatibility
+
+3. MISSING TOKENS:
+   - TK_BOOLEAN (mentioned in some contexts but not in terminals)
+   - TK_TRUE, TK_FALSE (for boolean literals)
+
+===============================================================================
+LL(1) CONVERSION REQUIRED
+===============================================================================
+
+To make this grammar LL(1) compatible, the following transformations are needed:
+
+1. ELIMINATE LEFT RECURSION:
+   arithmeticExpression → term arithmeticExpression'
+   arithmeticExpression' → operator term arithmeticExpression' | ∈
+
+2. LEFT-FACTORING:
+   conditionalStmt → TK_IF booleanExpression TK_THEN stmt otherStmts conditionalStmt'
+   conditionalStmt' → TK_ELSE otherStmts TK_ENDIF | TK_ENDIF
+
+3. ADD MISSING TERMINALS:
+   TK_BOOLEAN, TK_TRUE, TK_FALSE
+
+===============================================================================
+FIRST SETS (Preliminary)
+===============================================================================
+
+FIRST(program) = {TK_FUNID, TK_MAIN}
+FIRST(mainFunction) = {TK_MAIN}
+FIRST(function) = {TK_FUNID}
+FIRST(input_par) = {TK_INPUT}
+FIRST(output_par) = {TK_OUTPUT, ∈}
+FIRST(dataType) = {TK_INT, TK_REAL, TK_RECORD, TK_UNION}
+FIRST(stmts) = {TK_RECORD, TK_UNION, TK_TYPE, assignment/iteration/conditional/io/funCall statements}
+FIRST(arithmeticExpression) = {TK_OP, TK_ID, TK_NUM, TK_RNUM}
+FIRST(booleanExpression) = {TK_OP, TK_ID, TK_NUM, TK_RNUM, TK_NOT}
+
+===============================================================================
+*/
