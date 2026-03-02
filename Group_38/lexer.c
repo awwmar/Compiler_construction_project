@@ -7,13 +7,12 @@
 #include <ctype.h>
 #include <stdlib.h>
 
-/* ========== Keyword Table ========== */
 typedef struct {
     const char *word;
     TokenType type;
 } KeywordEntry;
 
-static KeywordEntry keywordTable[] = {
+static KeywordEntry kwTable[] = {
     {"main",       TK_MAIN}, 
     {"end",        TK_END},
     {"input",      TK_INPUT},
@@ -47,19 +46,19 @@ static KeywordEntry keywordTable[] = {
     {"or",         TK_OR},
 };
 
-#define NUM_KEYWORDS (sizeof(keywordTable) / sizeof(keywordTable[0]))
+#define NUM_KEYWORDS (sizeof(kwTable)/sizeof(kwTable[0]))
 
+/* checks if word is a keyword */
 static TokenType lookupKeyword(const char *word) {
-    for (int i = 0; i < (int)NUM_KEYWORDS; i++) {
-        if (strcmp(word, keywordTable[i].word) == 0)
-            return keywordTable[i].type;
+    for(int i=0; i<(int)NUM_KEYWORDS; i++){
+        if(strcmp(word, kwTable[i].word)==0)
+            return kwTable[i].type;
     }
-    return TK_ERROR; /* Not a keyword */
+    return TK_ERROR;
 }
 
-/* ========== Token type to string ========== */
 const char *tokenTypeToString(TokenType t) {
-    switch (t) {
+    switch(t){
         case TK_MAIN: return "TK_MAIN";
         case TK_END: return "TK_END";
         case TK_INPUT: return "TK_INPUT";
@@ -123,34 +122,34 @@ const char *tokenTypeToString(TokenType t) {
     return "UNKNOWN";
 }
 
-/* ========== Twin Buffer Implementation ========== */
+/* fills one half of the twin buffer from file */
 static void loadBuffer(TwinBuffer *B, int which) {
-    if (B->fileEnded) {
-        B->bytesInBuf[which] = 0;
-        B->buf[which][0] = '\0';
+    if(B->done){
+        B->loaded[which]=0;
+        B->buf[which][0]='\0';
         return;
     }
-    size_t n = fread(B->buf[which], 1, BUFFER_SIZE, B->fp);
-    B->bytesInBuf[which] = (int)n;
-    B->buf[which][n] = '\0'; /* Sentinel */
-    if ((int)n < BUFFER_SIZE)
-        B->fileEnded = 1;
+    size_t rd=fread(B->buf[which], 1, BUFFER_SIZE, B->fp);
+    B->loaded[which]=(int)rd;
+    B->buf[which][rd]='\0';
+    if((int)rd<BUFFER_SIZE)
+        B->done=1;
 }
 
 FILE *getStream(FILE *fp, TwinBuffer *B) {
-    if (!fp) {
+    if(!fp){
         printf("Error: Cannot open file!\n");
         return NULL;
     }
-    B->fp = fp;
-    B->lineNo = 1;
-    B->fileEnded = 0;
-    B->activeBuf = 0;
-    B->forward = 0;
-    B->lexBeginBuf = 0;
-    B->lexBeginIdx = 0;
-    B->bytesInBuf[0] = 0;
-    B->bytesInBuf[1] = 0;
+    B->fp=fp;
+    B->lineNo=1;
+    B->done=0;
+    B->curBuf=0;
+    B->fwd=0;
+    B->startBuf=0;
+    B->startPos=0;
+    B->loaded[0]=0;
+    B->loaded[1]=0;
 
     loadBuffer(B, 0);
     loadBuffer(B, 1);
@@ -158,356 +157,324 @@ FILE *getStream(FILE *fp, TwinBuffer *B) {
     return fp;
 }
 
-/* Get character at forward pointer and advance */
+/* reads char at forward pointer and moves ahead */
 static char nextChar(TwinBuffer *B) {
-    if (B->forward >= B->bytesInBuf[B->activeBuf]) {
-        /* Switch to other buffer */
-        int other = 1 - B->activeBuf;
-        if (B->bytesInBuf[other] == 0 && B->fileEnded)
+    if(B->fwd>=B->loaded[B->curBuf]){
+        int other=1-B->curBuf;
+        if(B->loaded[other]==0 && B->done)
             return EOF;
-        B->activeBuf = other;
-        B->forward = 0;
-        /* Reload the buffer we just left */
-        loadBuffer(B, 1 - other);
+        B->curBuf=other;
+        B->fwd=0;
+        loadBuffer(B, 1-other);
     }
-    if (B->forward >= B->bytesInBuf[B->activeBuf])
+    if(B->fwd>=B->loaded[B->curBuf])
         return EOF;
-    char c = B->buf[B->activeBuf][B->forward];
-    B->forward++;
-    return c;
+    char ch=B->buf[B->curBuf][B->fwd];
+    B->fwd++;
+    return ch;
 }
 
-/* Peek at current character without advancing */
+/* looks at current char without moving */
 static char peekChar(TwinBuffer *B) {
-    if (B->forward >= B->bytesInBuf[B->activeBuf]) {
-        int other = 1 - B->activeBuf;
-        if (B->bytesInBuf[other] == 0 && B->fileEnded)
+    if(B->fwd>=B->loaded[B->curBuf]){
+        int other=1-B->curBuf;
+        if(B->loaded[other]==0 && B->done)
             return EOF;
-        /* Look into the other buffer position 0 */
         return B->buf[other][0];
     }
-    return B->buf[B->activeBuf][B->forward];
+    return B->buf[B->curBuf][B->fwd];
 }
 
-/* Retract forward pointer by 1 */
+/* goes back one position */
 static void retract(TwinBuffer *B) {
-    if (B->forward > 0) {
-        B->forward--;
+    if(B->fwd>0){
+        B->fwd--;
     } else {
-        /* Go back to the other buffer's last position */
-        int other = 1 - B->activeBuf;
-        B->activeBuf = other;
-        B->forward = B->bytesInBuf[other] - 1;
+        int other=1-B->curBuf;
+        B->curBuf=other;
+        B->fwd=B->loaded[other]-1;
     }
 }
 
-/* Helper to check if char is in [b-d] */
-static int isBD(char c) { return c >= 'b' && c <= 'd'; }
+static int isBD(char ch) { return ch>='b' && ch<='d'; }
+static int is27(char ch) { return ch>='2' && ch<='7'; }
 
-/* Helper to check if char is in [2-7] */
-static int is27(char c) { return c >= '2' && c <= '7'; }
-
-/* ========== getNextToken ========== */
+/* main tokenizer function */
 TokenInfo getNextToken(TwinBuffer *B) {
     TokenInfo tok;
-    tok.type = TK_ERROR;
-    tok.lexeme[0] = '\0';
-    tok.lineNo = B->lineNo;
-    tok.value.intVal = 0;
-    tok.errorMsg[0] = '\0';
+    tok.type=TK_ERROR;
+    tok.lexeme[0]='\0';
+    tok.lineNo=B->lineNo;
+    tok.value.numVal=0;
+    tok.errorMsg[0]='\0';
 
-    char c;
-    int idx;
+    char ch;
+    int pos;
 
-    /* Skip whitespace */
-    while (1) {
-        c = nextChar(B);
-        if (c == EOF) {
-            tok.type = TK_EOF;
+    while(1){
+        ch=nextChar(B);
+        if(ch==EOF){
+            tok.type=TK_EOF;
             strcpy(tok.lexeme, "EOF");
-            tok.lineNo = B->lineNo;
+            tok.lineNo=B->lineNo;
             return tok;
         }
-        if (c == '\n') {
+        if(ch=='\n'){
             B->lineNo++;
             continue;
         }
-        if (c == ' ' || c == '\t' || c == '\r')
+        if(ch==' ' || ch=='\t' || ch=='\r')
             continue;
         break;
     }
 
-    tok.lineNo = B->lineNo;
+    tok.lineNo=B->lineNo;
 
-    /* ---- COMMENT: % ---- */
-    if (c == '%') {
-        tok.type = TK_COMMENT;
+    if(ch=='%'){
+        tok.type=TK_COMMENT;
         strcpy(tok.lexeme, "%");
-        /* Skip rest of line */
-        while (1) {
-            char ch = nextChar(B);
-            if (ch == '\n') { B->lineNo++; break; }
-            if (ch == EOF) break;
+        while(1){
+            char nc=nextChar(B);
+            if(nc=='\n'){ B->lineNo++; break; }
+            if(nc==EOF) break;
         }
         return tok;
     }
 
-    /* ---- FUNID: _[a-zA-Z0-9]* ---- */
-    if (c == '_') {
-        idx = 0;
-        tok.lexeme[idx++] = c;
-        while (1) {
-            char ch = peekChar(B);
-            if (isalnum(ch) || ch == '_') {
-                tok.lexeme[idx++] = nextChar(B);
+    if(ch=='_'){
+        pos=0;
+        tok.lexeme[pos++]=ch;
+        while(1){
+            char nc=peekChar(B);
+            if(isalnum(nc) || nc=='_'){
+                tok.lexeme[pos++]=nextChar(B);
             } else break;
         }
-        tok.lexeme[idx] = '\0';
-        if (strcmp(tok.lexeme, "_main") == 0)
-            tok.type = TK_MAIN;
+        tok.lexeme[pos]='\0';
+        if(strcmp(tok.lexeme, "_main")==0)
+            tok.type=TK_MAIN;
         else
-            tok.type = TK_FUNID;
+            tok.type=TK_FUNID;
         return tok;
     }
 
-    /* ---- RUID: #[a-z]+ ---- */
-    if (c == '#') {
-        idx = 0;
-        tok.lexeme[idx++] = c;
-        while (islower(peekChar(B))) {
-            tok.lexeme[idx++] = nextChar(B);
+    if(ch=='#'){
+        pos=0;
+        tok.lexeme[pos++]=ch;
+        while(islower(peekChar(B))){
+            tok.lexeme[pos++]=nextChar(B);
         }
-        tok.lexeme[idx] = '\0';
-        tok.type = TK_RUID;
+        tok.lexeme[pos]='\0';
+        tok.type=TK_RUID;
         return tok;
     }
 
-    /* ---- Identifiers starting with lowercase letter ---- */
-    if (islower(c)) {
-        idx = 0;
-        tok.lexeme[idx++] = c;
+    if(islower(ch)){
+        pos=0;
+        tok.lexeme[pos++]=ch;
 
-        /* Check if this could be TK_ID: [b-d][2-7]([b-d]|[2-7])* */
-        if (isBD(c) && is27(peekChar(B))) {
-            /* TK_ID path */
-            tok.lexeme[idx++] = nextChar(B); /* consume the [2-7] */
-            while (isBD(peekChar(B)) || is27(peekChar(B))) {
-                if (idx < MAX_LEXEME_LEN - 1)
-                    tok.lexeme[idx++] = nextChar(B);
+        if(isBD(ch) && is27(peekChar(B))){
+            tok.lexeme[pos++]=nextChar(B);
+            while(isBD(peekChar(B)) || is27(peekChar(B))){
+                if(pos<MAX_LEXEME_LEN-1)
+                    tok.lexeme[pos++]=nextChar(B);
                 else
-                    nextChar(B); /* consume but don't store */
+                    nextChar(B);
             }
-            tok.lexeme[idx] = '\0';
+            tok.lexeme[pos]='\0';
 
-            if (idx > MAX_ID_LEN) {
-                tok.type = TK_ERROR;
+            if(pos>MAX_ID_LEN){
+                tok.type=TK_ERROR;
                 sprintf(tok.errorMsg, "Line No %d: Error :Variable Identifier is longer than the prescribed length of 20 characters.\n", tok.lineNo);
                 printf("%s", tok.errorMsg);
                 return tok;
             }
-            tok.type = TK_ID;
+            tok.type=TK_ID;
             return tok;
         }
 
-        /* Keyword / FIELDID path: [a-z]+ */
-        while (islower(peekChar(B))) {
-            if (idx < MAX_LEXEME_LEN - 1)
-                tok.lexeme[idx++] = nextChar(B);
+        while(islower(peekChar(B))){
+            if(pos<MAX_LEXEME_LEN-1)
+                tok.lexeme[pos++]=nextChar(B);
             else
                 nextChar(B);
         }
-        tok.lexeme[idx] = '\0';
+        tok.lexeme[pos]='\0';
 
-        /* Check keyword */
-        TokenType kw = lookupKeyword(tok.lexeme);
-        if (kw != TK_ERROR) {
-            tok.type = kw;
+        TokenType kw=lookupKeyword(tok.lexeme);
+        if(kw!=TK_ERROR){
+            tok.type=kw;
         } else {
-            tok.type = TK_FIELDID;
+            tok.type=TK_FIELDID;
         }
         return tok;
     }
 
-    /* ---- Numbers: [0-9]+ with optional .XX and EXX ---- */
-    if (isdigit(c)) {
-        idx = 0;
-        tok.lexeme[idx++] = c;
+    if(isdigit(ch)){
+        pos=0;
+        tok.lexeme[pos++]=ch;
 
-        /* Read all integer digits */
-        while (isdigit(peekChar(B))) {
-            tok.lexeme[idx++] = nextChar(B);
+        while(isdigit(peekChar(B))){
+            tok.lexeme[pos++]=nextChar(B);
         }
-        tok.lexeme[idx] = '\0';
+        tok.lexeme[pos]='\0';
 
-        /* Check for decimal point */
-        if (peekChar(B) == '.') {
-            char dot = nextChar(B); /* consume dot */
+        if(peekChar(B)=='.'){
+            char dot=nextChar(B);
+            tok.lexeme[pos++]=dot;
 
-            /* Count fractional digits */
-            tok.lexeme[idx++] = dot;
-
-            int fracDigits = 0;
-            while (isdigit(peekChar(B))) {
-                tok.lexeme[idx++] = nextChar(B);
-                fracDigits++;
+            int fracCount=0;
+            while(isdigit(peekChar(B))){
+                tok.lexeme[pos++]=nextChar(B);
+                fracCount++;
             }
-            tok.lexeme[idx] = '\0';
+            tok.lexeme[pos]='\0';
 
-            /* Must have exactly 2 fractional digits */
-            if (fracDigits != 2) {
-                /* Error: Unknown pattern */
-                tok.type = TK_ERROR;
+            if(fracCount!=2){
+                tok.type=TK_ERROR;
                 sprintf(tok.errorMsg, "Line no: %d : Error: Unknown pattern <%s>\n", tok.lineNo, tok.lexeme);
                 printf("%s", tok.errorMsg);
                 return tok;
             }
 
-            /* Check for E (scientific notation) */
-            if (peekChar(B) == 'E') {
-                tok.lexeme[idx++] = nextChar(B); /* consume E */
+            if(peekChar(B)=='E'){
+                tok.lexeme[pos++]=nextChar(B);
 
-                /* Optional sign */
-                char pk = peekChar(B);
-                if (pk == '+' || pk == '-') {
-                    tok.lexeme[idx++] = nextChar(B);
+                char pk=peekChar(B);
+                if(pk=='+' || pk=='-'){
+                    tok.lexeme[pos++]=nextChar(B);
                 }
 
-                /* Must have exactly 2 exponent digits */
-                int expDigits = 0;
-                while (isdigit(peekChar(B)) && expDigits < 2) {
-                    tok.lexeme[idx++] = nextChar(B);
-                    expDigits++;
+                int expCount=0;
+                while(isdigit(peekChar(B)) && expCount<2){
+                    tok.lexeme[pos++]=nextChar(B);
+                    expCount++;
                 }
-                tok.lexeme[idx] = '\0';
+                tok.lexeme[pos]='\0';
 
-                if (expDigits != 2) {
-                    tok.type = TK_ERROR;
+                if(expCount!=2){
+                    tok.type=TK_ERROR;
                     sprintf(tok.errorMsg, "Line no: %d : Error: Unknown pattern <%s>\n", tok.lineNo, tok.lexeme);
                     printf("%s", tok.errorMsg);
                     return tok;
                 }
 
-                tok.type = TK_RNUM;
-                tok.value.realVal = (float)atof(tok.lexeme);
+                tok.type=TK_RNUM;
+                tok.value.decVal=(float)atof(tok.lexeme);
                 return tok;
             }
 
-            /* Real number without scientific notation */
-            tok.type = TK_RNUM;
-            tok.value.realVal = (float)atof(tok.lexeme);
+            tok.type=TK_RNUM;
+            tok.value.decVal=(float)atof(tok.lexeme);
             return tok;
         }
 
-        /* Plain integer */
-        tok.type = TK_NUM;
-        tok.value.intVal = atoi(tok.lexeme);
+        tok.type=TK_NUM;
+        tok.value.numVal=atoi(tok.lexeme);
         return tok;
     }
 
-    /* ---- Single and multi-character operators ---- */
-    switch (c) {
+    switch(ch){
         case '[':
-            tok.type = TK_SQL;
+            tok.type=TK_SQL;
             strcpy(tok.lexeme, "[");
             return tok;
         case ']':
-            tok.type = TK_SQR;
+            tok.type=TK_SQR;
             strcpy(tok.lexeme, "]");
             return tok;
         case ';':
-            tok.type = TK_SEM;
+            tok.type=TK_SEM;
             strcpy(tok.lexeme, ";");
             return tok;
         case ':':
-            tok.type = TK_COLON;
+            tok.type=TK_COLON;
             strcpy(tok.lexeme, ":");
             return tok;
         case '.':
-            tok.type = TK_DOT;
+            tok.type=TK_DOT;
             strcpy(tok.lexeme, ".");
             return tok;
         case ',':
-            tok.type = TK_COMMA;
+            tok.type=TK_COMMA;
             strcpy(tok.lexeme, ",");
             return tok;
         case '(':
-            tok.type = TK_OP;
+            tok.type=TK_OP;
             strcpy(tok.lexeme, "(");
             return tok;
         case ')':
-            tok.type = TK_CL;
+            tok.type=TK_CL;
             strcpy(tok.lexeme, ")");
             return tok;
         case '+':
-            tok.type = TK_PLUS;
+            tok.type=TK_PLUS;
             strcpy(tok.lexeme, "+");
             return tok;
         case '-':
-            tok.type = TK_MINUS;
+            tok.type=TK_MINUS;
             strcpy(tok.lexeme, "-");
             return tok;
         case '*':
-            tok.type = TK_MUL;
+            tok.type=TK_MUL;
             strcpy(tok.lexeme, "*");
             return tok;
         case '/':
-            tok.type = TK_DIV;
+            tok.type=TK_DIV;
             strcpy(tok.lexeme, "/");
             return tok;
         case '~':
-            tok.type = TK_NOT;
+            tok.type=TK_NOT;
             strcpy(tok.lexeme, "~");
             return tok;
 
         case '<':
-            /* Could be <, <=, or <--- */
-            if (peekChar(B) == '=') {
+            if(peekChar(B)=='='){
                 nextChar(B);
-                tok.type = TK_LE;
+                tok.type=TK_LE;
                 strcpy(tok.lexeme, "<=");
-            } else if (peekChar(B) == '-') {
-                nextChar(B); /* first - */
-                if (peekChar(B) == '-') {
-                    nextChar(B); /* second - */
-                    if (peekChar(B) == '-') {
-                        nextChar(B); /* third - */
-                        tok.type = TK_ASSIGNOP;
+            } else if(peekChar(B)=='-'){
+                nextChar(B);
+                if(peekChar(B)=='-'){
+                    nextChar(B);
+                    if(peekChar(B)=='-'){
+                        nextChar(B);
+                        tok.type=TK_ASSIGNOP;
                         strcpy(tok.lexeme, "<---");
                     } else {
-                        /* <-- is not valid, retract and return < */
                         retract(B); retract(B);
-                        tok.type = TK_LT;
+                        tok.type=TK_LT;
                         strcpy(tok.lexeme, "<");
                     }
                 } else {
                     retract(B);
-                    tok.type = TK_LT;
+                    tok.type=TK_LT;
                     strcpy(tok.lexeme, "<");
                 }
             } else {
-                tok.type = TK_LT;
+                tok.type=TK_LT;
                 strcpy(tok.lexeme, "<");
             }
             return tok;
 
         case '>':
-            if (peekChar(B) == '=') {
+            if(peekChar(B)=='='){
                 nextChar(B);
-                tok.type = TK_GE;
+                tok.type=TK_GE;
                 strcpy(tok.lexeme, ">=");
             } else {
-                tok.type = TK_GT;
+                tok.type=TK_GT;
                 strcpy(tok.lexeme, ">");
             }
             return tok;
 
         case '=':
-            if (peekChar(B) == '=') {
+            if(peekChar(B)=='='){
                 nextChar(B);
-                tok.type = TK_EQ;
+                tok.type=TK_EQ;
                 strcpy(tok.lexeme, "==");
             } else {
-                tok.type = TK_ERROR;
+                tok.type=TK_ERROR;
                 strcpy(tok.lexeme, "=");
                 sprintf(tok.errorMsg, "Line No %d: Error : Unknown Symbol <%s>\n", tok.lineNo, tok.lexeme);
                 printf("%s", tok.errorMsg);
@@ -515,12 +482,12 @@ TokenInfo getNextToken(TwinBuffer *B) {
             return tok;
 
         case '!':
-            if (peekChar(B) == '=') {
+            if(peekChar(B)=='='){
                 nextChar(B);
-                tok.type = TK_NE;
+                tok.type=TK_NE;
                 strcpy(tok.lexeme, "!=");
             } else {
-                tok.type = TK_ERROR;
+                tok.type=TK_ERROR;
                 strcpy(tok.lexeme, "!");
                 sprintf(tok.errorMsg, "Line No %d: Error : Unknown Symbol <%s>\n", tok.lineNo, tok.lexeme);
                 printf("%s", tok.errorMsg);
@@ -528,20 +495,20 @@ TokenInfo getNextToken(TwinBuffer *B) {
             return tok;
 
         case '&':
-            if (peekChar(B) == '&') {
-                nextChar(B); /* second & */
-                if (peekChar(B) == '&') {
-                    nextChar(B); /* third & */
-                    tok.type = TK_AND;
+            if(peekChar(B)=='&'){
+                nextChar(B);
+                if(peekChar(B)=='&'){
+                    nextChar(B);
+                    tok.type=TK_AND;
                     strcpy(tok.lexeme, "&&&");
                 } else {
-                    tok.type = TK_ERROR;
+                    tok.type=TK_ERROR;
                     strcpy(tok.lexeme, "&&");
                     sprintf(tok.errorMsg, "Line no: %d : Error: Unknown pattern <%s>\n", tok.lineNo, tok.lexeme);
                     printf("%s", tok.errorMsg);
                 }
             } else {
-                tok.type = TK_ERROR;
+                tok.type=TK_ERROR;
                 strcpy(tok.lexeme, "&");
                 sprintf(tok.errorMsg, "Line No %d : Error: Unknown Symbol <%s>\n", tok.lineNo, tok.lexeme);
                 printf("%s", tok.errorMsg);
@@ -549,20 +516,20 @@ TokenInfo getNextToken(TwinBuffer *B) {
             return tok;
 
         case '@':
-            if (peekChar(B) == '@') {
+            if(peekChar(B)=='@'){
                 nextChar(B);
-                if (peekChar(B) == '@') {
+                if(peekChar(B)=='@'){
                     nextChar(B);
-                    tok.type = TK_OR;
+                    tok.type=TK_OR;
                     strcpy(tok.lexeme, "@@@");
                 } else {
-                    tok.type = TK_ERROR;
+                    tok.type=TK_ERROR;
                     strcpy(tok.lexeme, "@@");
                     sprintf(tok.errorMsg, "Line no: %d : Error: Unknown pattern <%s>\n", tok.lineNo, tok.lexeme);
                     printf("%s", tok.errorMsg);
                 }
             } else {
-                tok.type = TK_ERROR;
+                tok.type=TK_ERROR;
                 strcpy(tok.lexeme, "@");
                 sprintf(tok.errorMsg, "Line No %d : Error: Unknown Symbol <%s>\n", tok.lineNo, tok.lexeme);
                 printf("%s", tok.errorMsg);
@@ -570,37 +537,34 @@ TokenInfo getNextToken(TwinBuffer *B) {
             return tok;
 
         default:
-            /* Unknown symbol */
-            tok.type = TK_ERROR;
-            tok.lexeme[0] = c;
-            tok.lexeme[1] = '\0';
+            tok.type=TK_ERROR;
+            tok.lexeme[0]=ch;
+            tok.lexeme[1]='\0';
             sprintf(tok.errorMsg, "Line No %d : Error: Unknown Symbol <%s>\n", tok.lineNo, tok.lexeme);
             printf("%s", tok.errorMsg);
             return tok;
     }
 }
 
-/* ========== removeComments ========== */
+/* strips out all comment lines from the file */
 void removeComments(char *testcaseFile) {
-    FILE *fin = fopen(testcaseFile, "r");
+    FILE *fin=fopen(testcaseFile, "r");
 
-    if (!fin) {
+    if(!fin){
         printf("Error: Cannot open file %s\n", testcaseFile);
         return;
     }
 
-    int c;
-    while ((c = fgetc(fin)) != EOF) {
-        if (c == '%') {
-            /* Skip comment content until newline */
-            while (c != '\n' && c != EOF)
-                c = fgetc(fin);
-            /* Print/write the newline to preserve line numbers */
-            if (c == '\n') {
-                printf("%c", c);
+    int ch;
+    while((ch=fgetc(fin))!=EOF){
+        if(ch=='%'){
+            while(ch!='\n' && ch!=EOF)
+                ch=fgetc(fin);
+            if(ch=='\n'){
+                printf("%c", ch);
             }
         } else {
-            printf("%c", c);
+            printf("%c", ch);
         }
     }
 
